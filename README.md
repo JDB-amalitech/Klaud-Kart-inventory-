@@ -14,7 +14,15 @@ Kloud Kart's PostgreSQL database: diagnosed, cleaned, made strict, and extended 
 | `performance/` | Before/after timings with full query plans (`README.md`) |
 | `validation/` | Before/after evidence for cleaning and the race test |
 | `DATA_FINDINGS.md` | The written data diagnosis, ranked by danger |
+| `MEMO_TO_NANA.md` | One-page memo to Nana, in business language |
 | `ADR/` | Decision records: why each choice was made, and what was rejected |
+| `CHANGELOG.md` | Version history and pinned environment |
+
+## Data protection
+
+- **Personal data:** `customers` holds names, emails, phones and cities. The same data also sits in `quarantine.customers` (merged duplicates) and in `cleaning.change_log` (old values of cleaned emails and names). Grant access to those schemas only to people who need it, and apply the same retention and deletion rules as `customers`. Deleting a customer means removing their rows from all three.
+- **Credentials:** `kloudkart` / `kloudkart` in `docker-compose.yml` and `.env.example` are local development defaults. Set real values in `.env` (which git ignores) for any shared or hosted database.
+- **Lab data:** the CSVs in `M03_Resources/data/` are the course's training dataset, not live customer records.
 
 ## Setup
 
@@ -43,6 +51,7 @@ python M03_Resources/race_test.py
 | Need | Run |
 |---|---|
 | Sell stock | `SELECT * FROM place_order(customer_id, product_id, quantity);` |
+| Cancel a pending order (returns its stock) | `SELECT * FROM cancel_order(order_id);` |
 | Restock / return / damage / count | `SELECT record_movement(product_id, change, 'restock', 'note');` |
 | Monday report (today, or any date) | `SELECT * FROM v_monday_report;` or `SELECT * FROM monday_report('2026-08-31');` |
 | Top 100 customers | `SELECT * FROM v_top_100_customers;` |

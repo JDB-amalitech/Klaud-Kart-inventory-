@@ -32,7 +32,7 @@
 - **R4 above 100% is a finding, not an error.** The 776 fulfilled lines that were quarantined still have their stock movements in the log (355 lines from "unknown customer" orders, 418 duplicate copies, 3 extreme lines). So:
   - the orders with an unknown customer were **real sales**: stock left the shelf; only the customer ID is broken
   - for the duplicate copies, either the customer took both units and was under-charged, or the double entry happened in the stock log too
-  
+
   The log has no `order_id`, so I can't tell which. Both are reversible: the rows sit in `quarantine.*`.
 
 ## Where everything went
