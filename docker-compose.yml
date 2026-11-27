@@ -1,7 +1,7 @@
 services:
   db:
     # PostgreSQL 18: the version the lab is graded on.
-    image: postgres:18
+    image: postgres:18.7
     container_name: kloudkart-db
     restart: unless-stopped
     # 400 concurrent buyers in race_test.py need 400 connections; the default of 100 refuses most of them.
