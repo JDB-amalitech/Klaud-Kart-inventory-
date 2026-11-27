@@ -1,7 +1,8 @@
 # Kloud Kart: Data Findings
 
 - **Date:** 2026-11-27
-- **Scope:** the full extract, loaded fresh with `docker compose up`, then profiled and reconciled read-only. Nothing has been cleaned.
+- **Scope:** the full extract, loaded fresh with `docker compose up`, then profiled and reconciled read-only. Every figure below describes the data **as loaded, before cleaning**.
+- **Status since:** the problems have been cleaned ([ADR/0004](ADR/0004-data-cleaning.md)), and the before/after results are in [validation/POST_VALIDATION.md](validation/POST_VALIDATION.md).
 - **Evidence:** every figure below comes from a query that can be re-run:
   - check IDs (P1, C2, O3, I1, L4) are in `profiling/`, run with `diagnosis.sql`
   - reconciliation IDs (R1 to R6) are in `relationDATA/reconciliation.sql`
