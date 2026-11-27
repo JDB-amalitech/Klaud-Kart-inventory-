@@ -13,3 +13,5 @@
 \ir 04_monday_report.sql
 \echo '=== 05 indexes'
 \ir 05_indexes.sql
+\echo '=== 06 cancel_order (improvement beyond the brief)'
+\ir 06_cancel_order.sql
