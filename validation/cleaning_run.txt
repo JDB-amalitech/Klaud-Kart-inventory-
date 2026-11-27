@@ -1,0 +1,131 @@
+Null display is "(null)".
+=== 00 setup
+BEGIN
+CREATE SCHEMA
+CREATE SCHEMA
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+INSERT 0 1
+DO
+CREATE FUNCTION
+COMMIT
+ one | extract_end | max_order_id | max_log_id |          captured_at          
+-----+-------------+--------------+------------+-------------------------------
+ t   | 2026-08-31  |       659384 |     982487 | 2026-11-27 15:16:15.578616+00
+(1 row)
+
+=== LEVEL 0 · 01 categories
+BEGIN
+INSERT 0 1
+INSERT 0 2
+ALTER TABLE
+COMMIT
+=== LEVEL 0 · 02 customers
+BEGIN
+INSERT 0 12699
+SELECT 535
+INSERT 0 2666
+                  quarantined                  | rows 
+-----------------------------------------------+------
+ duplicate accounts (orders moved to survivor) |  535
+(1 row)
+
+CREATE INDEX
+COMMIT
+=== LEVEL 1 · 03 products
+BEGIN
+INSERT 0 37
+INSERT 0 14
+DELETE 0
+INSERT 0 144
+ALTER TABLE
+psql:/cleaning/03_products.sql:48: NOTICE:  constraint "chk_products_stock_nonnegative" of relation "products" does not exist, skipping
+ALTER TABLE
+COMMIT
+ negative_stock_reset | products_to_count 
+----------------------+-------------------
+                   14 |               144
+(1 row)
+
+=== LEVEL 1 · 04 orders
+BEGIN
+INSERT 0 116394
+                  quarantined                  | rows 
+-----------------------------------------------+------
+ lines of orders whose customer does not exist |  471
+(1 row)
+
+             quarantined              | rows 
+--------------------------------------+------
+ orders whose customer does not exist |  210
+(1 row)
+
+DELETE 0
+INSERT 0 24
+psql:/cleaning/04_orders.sql:50: NOTICE:  constraint "chk_orders_status" of relation "orders" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+COMMIT
+  status   | orders 
+-----------+--------
+ completed | 111207
+ pending   |  15985
+ shipped   |  12837
+ cancelled |  12676
+ refunded  |   6469
+(5 rows)
+
+=== LEVEL 2 · 05 inventory_log
+BEGIN
+                 quarantined                  | rows 
+----------------------------------------------+------
+ stock movements whose product does not exist |  120
+(1 row)
+
+DELETE 0
+INSERT 0 40
+ALTER TABLE
+COMMIT
+ movements_to_confirm 
+----------------------
+                   40
+(1 row)
+
+=== LEVEL 2 · 06 order_items
+BEGIN
+           quarantined            | rows 
+----------------------------------+------
+ lines whose order does not exist |  692
+(1 row)
+
+             quarantined              | rows 
+--------------------------------------+------
+ lines with a quantity of 999 or more |    6
+(1 row)
+
+        quarantined        | rows 
+---------------------------+------
+ orders left with no lines |    2
+(1 row)
+
+                 quarantined                 | rows 
+---------------------------------------------+------
+ duplicate lines proven to be double entries |  526
+(1 row)
+
+DELETE 0
+INSERT 0 2194
+ALTER TABLE
+ALTER TABLE
+psql:/cleaning/06_order_items.sql:68: NOTICE:  constraint "chk_order_items_quantity" of relation "order_items" does not exist, skipping
+ALTER TABLE
+COMMIT
+ table_name  |               issue               | to_review 
+-------------+-----------------------------------+-----------
+ order_items | unit_price is 0.00                |       151
+ order_items | unit_price is null                |       148
+ orders      | total differs: line with no price |       296
+ orders      | total differs: no visible cause   |      1599
+(4 rows)
+

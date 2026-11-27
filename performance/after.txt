@@ -1,0 +1,381 @@
+Pager usage is off.
+### A. NAIVE Monday report: one subquery per figure per customer (14 per customer), first 200 customers
+                                                                             QUERY PLAN                                                                              
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop  (cost=8.55..24667.51 rows=200 width=76) (actual time=0.344..11.853 rows=200.00 loops=1)
+   Buffers: shared hit=8845 read=8
+   ->  HashAggregate  (cost=8.26..10.26 rows=200 width=4) (actual time=0.108..0.162 rows=200.00 loops=1)
+         Group Key: customers.customer_id
+         Batches: 1  Memory Usage: 32kB
+         Buffers: shared hit=4
+         ->  Limit  (cost=0.29..7.76 rows=200 width=4) (actual time=0.014..0.065 rows=200.00 loops=1)
+               Buffers: shared hit=4
+               ->  Index Only Scan using customers_pkey on customers  (cost=0.29..1490.57 rows=39885 width=4) (actual time=0.013..0.049 rows=200.00 loops=1)
+                     Heap Fetches: 0
+                     Index Searches: 1
+                     Buffers: shared hit=4
+   ->  Index Only Scan using customers_pkey on customers c  (cost=0.29..3.09 rows=1 width=4) (actual time=0.001..0.001 rows=1.00 loops=200)
+         Index Cond: (customer_id = customers.customer_id)
+         Heap Fetches: 0
+         Index Searches: 200
+         Buffers: shared hit=401
+   SubPlan 1
+     ->  Aggregate  (cost=8.53..8.54 rows=1 width=32) (actual time=0.005..0.005 rows=1.00 loops=200)
+           Buffers: shared hit=596 read=8
+           ->  Index Only Scan using ix_orders_customer_date on orders o  (cost=0.42..8.52 rows=4 width=7) (actual time=0.002..0.003 rows=2.93 loops=200)
+                 Index Cond: (customer_id = c.customer_id)
+                 Filter: (status = ANY ('{completed,shipped}'::text[]))
+                 Rows Removed by Filter: 1
+                 Heap Fetches: 0
+                 Index Searches: 200
+                 Buffers: shared hit=596 read=8
+   SubPlan 2
+     ->  Aggregate  (cost=8.53..8.54 rows=1 width=8) (actual time=0.003..0.004 rows=1.00 loops=200)
+           Buffers: shared hit=604
+           ->  Index Only Scan using ix_orders_customer_date on orders o_1  (cost=0.42..8.52 rows=4 width=0) (actual time=0.002..0.003 rows=2.93 loops=200)
+                 Index Cond: (customer_id = c.customer_id)
+                 Filter: (status = ANY ('{completed,shipped}'::text[]))
+                 Rows Removed by Filter: 1
+                 Heap Fetches: 0
+                 Index Searches: 200
+                 Buffers: shared hit=604
+   SubPlan 4
+     ->  Aggregate  (cost=103.12..103.13 rows=1 width=32) (actual time=0.047..0.047 rows=1.00 loops=200)
+           Buffers: shared hit=7240
+           ->  Sort  (cost=0.34..0.37 rows=12 width=8) (actual time=0.003..0.004 rows=12.00 loops=200)
+                 Sort Key: m.m
+                 Sort Method: quicksort  Memory: 25kB
+                 Buffers: shared hit=3
+                 ->  Function Scan on generate_series m  (cost=0.00..0.12 rows=12 width=8) (actual time=0.000..0.001 rows=12.00 loops=200)
+           SubPlan 3
+             ->  Aggregate  (cost=8.55..8.56 rows=1 width=32) (actual time=0.003..0.003 rows=1.00 loops=2400)
+                   Buffers: shared hit=7237
+                   ->  Index Only Scan using ix_orders_customer_date on orders o_2  (cost=0.42..8.54 rows=1 width=7) (actual time=0.002..0.002 rows=0.24 loops=2400)
+                         Index Cond: (customer_id = c.customer_id)
+                         Filter: ((status = ANY ('{completed,shipped}'::text[])) AND (date_trunc('month'::text, order_date) = m.m))
+                         Rows Removed by Filter: 4
+                         Heap Fetches: 0
+                         Index Searches: 2400
+                         Buffers: shared hit=7237
+ Planning:
+   Buffers: shared hit=266 read=1
+ Planning Time: 1.288 ms
+ Execution Time: 12.053 ms
+(59 rows)
+
+### B. Monday report, ALL customers, one pass (monday_report)
+                                                                                                                                                                   QUERY PLAN                                                                                                                                                                    
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ WindowAgg  (cost=42605.21..48887.08 rows=39885 width=162) (actual time=1357.075..1518.833 rows=39885.00 loops=1)
+   Window: w1 AS (ORDER BY (COALESCE(pc.total_spent, '0'::numeric)) ROWS UNBOUNDED PRECEDING)
+   Storage: Memory  Maximum Storage: 17kB
+   Buffers: shared hit=2144, temp read=5408 written=5955
+   CTE counted
+     ->  Seq Scan on orders o  (cost=0.00..4655.44 rows=122602 width=27) (actual time=0.028..37.896 rows=124024.00 loops=1)
+           Filter: ((status = ANY ('{completed,shipped}'::text[])) AND (order_date < '2026-09-01'::date) AND (order_date <= now()))
+           Rows Removed by Filter: 35148
+           Buffers: shared hit=1472
+   CTE per_month
+     ->  HashAggregate  (cost=13283.07..16799.08 rows=119883 width=40) (actual time=122.391..205.623 rows=101146.00 loops=1)
+           Group Key: counted_1.customer_id, (date_trunc('month'::text, counted_1.order_date))::date
+           Planned Partitions: 8  Batches: 9  Memory Usage: 8273kB  Disk Usage: 3544kB
+           Buffers: temp read=1038 written=796
+           ->  CTE Scan on counted counted_1  (cost=0.00..4283.10 rows=121008 width=24) (actual time=0.191..75.215 rows=122392.00 loops=1)
+                 Filter: (order_date >= (date_trunc('month'::text, ('2026-08-31'::date)::timestamp with time zone) - '11 mons'::interval))
+                 Rows Removed by Filter: 1632
+                 Storage: Disk  Maximum Storage: 4982kB
+                 Buffers: temp read=623 written=1
+   ->  Sort  (cost=21150.66..21250.38 rows=39885 width=122) (actual time=1357.045..1365.867 rows=39885.00 loops=1)
+         Sort Key: (COALESCE(pc.total_spent, '0'::numeric)) DESC
+         Sort Method: external merge  Disk: 7992kB
+         Buffers: shared hit=2144, temp read=5408 written=5955
+         ->  Hash Left Join  (cost=14237.97..15509.24 rows=39885 width=122) (actual time=1299.587..1329.245 rows=39885.00 loops=1)
+               Hash Cond: (c.customer_id = mo.customer_id)
+               Buffers: shared hit=2141, temp read=4409 written=4954
+               ->  Hash Left Join  (cost=4284.91..5451.47 rows=39885 width=90) (actual time=198.350..216.896 rows=39885.00 loops=1)
+                     Hash Cond: (c.customer_id = pc.customer_id)
+                     Buffers: shared hit=2135, temp read=181 written=963
+                     ->  Seq Scan on customers c  (cost=0.00..1061.85 rows=39885 width=50) (actual time=0.013..3.234 rows=39885.00 loops=1)
+                           Buffers: shared hit=663
+                     ->  Hash  (cost=3958.72..3958.72 rows=26096 width=44) (actual time=198.153..198.155 rows=38095.00 loops=1)
+                           Buckets: 65536 (originally 32768)  Batches: 1 (originally 1)  Memory Usage: 2534kB
+                           Buffers: shared hit=1472, temp read=181 written=963
+                           ->  Subquery Scan on pc  (cost=3371.56..3958.72 rows=26096 width=44) (actual time=143.752..189.007 rows=38095.00 loops=1)
+                                 Buffers: shared hit=1472, temp read=181 written=963
+                                 ->  HashAggregate  (cost=3371.56..3697.76 rows=26096 width=44) (actual time=143.750..185.402 rows=38095.00 loops=1)
+                                       Group Key: counted.customer_id
+                                       Batches: 5  Memory Usage: 8241kB  Disk Usage: 1704kB
+                                       Buffers: shared hit=1472, temp read=181 written=963
+                                       ->  CTE Scan on counted  (cost=0.00..2452.04 rows=122602 width=20) (actual time=0.032..82.493 rows=124024.00 loops=1)
+                                             Storage: Disk  Maximum Storage: 4982kB
+                                             Buffers: shared hit=1472, temp written=622
+               ->  Hash  (cost=9950.56..9950.56 rows=200 width=36) (actual time=1101.214..1101.219 rows=38027.00 loops=1)
+                     Buckets: 65536 (originally 1024)  Batches: 1 (originally 1)  Memory Usage: 6697kB
+                     Buffers: shared hit=6, temp read=4228 written=3991
+                     ->  Subquery Scan on mo  (cost=9892.11..9950.56 rows=200 width=36) (actual time=894.310..1087.435 rows=38027.00 loops=1)
+                           Buffers: shared hit=6, temp read=4228 written=3991
+                           ->  GroupAggregate  (cost=9892.11..9948.56 rows=200 width=36) (actual time=894.308..1083.957 rows=38027.00 loops=1)
+                                 Group Key: per_month.customer_id
+                                 Buffers: shared hit=6, temp read=4228 written=3991
+                                 ->  Sort  (cost=9892.11..9910.09 rows=7193 width=40) (actual time=894.200..999.056 rows=456324.00 loops=1)
+                                       Sort Key: per_month.customer_id, (((generate_series((date_trunc('month'::text, ('2026-08-31'::date)::timestamp with time zone) - '11 mons'::interval), date_trunc('month'::text, ('2026-08-31'::date)::timestamp with time zone), '1 mon'::interval)))::date)
+                                       Sort Method: external merge  Disk: 8888kB
+                                       Buffers: shared hit=6, temp read=4228 written=3991
+                                       ->  Hash Right Join  (cost=2765.82..9431.31 rows=7193 width=40) (actual time=451.371..665.540 rows=456324.00 loops=1)
+                                             Hash Cond: ((pm.customer_id = per_month.customer_id) AND (pm.month = (((generate_series((date_trunc('month'::text, ('2026-08-31'::date)::timestamp with time zone) - '11 mons'::interval), date_trunc('month'::text, ('2026-08-31'::date)::timestamp with time zone), '1 mon'::interval)))::date)))
+                                             Buffers: temp read=3117 written=2875
+                                             ->  CTE Scan on per_month pm  (cost=0.00..2397.66 rows=119883 width=40) (actual time=0.017..8.973 rows=101146.00 loops=1)
+                                                   Storage: Disk  Maximum Storage: 4096kB
+                                                   Buffers: temp read=311 written=1
+                                             ->  Hash  (cost=2729.82..2729.82 rows=2400 width=8) (actual time=451.276..451.278 rows=456324.00 loops=1)
+                                                   Buckets: 262144 (originally 4096)  Batches: 4 (originally 1)  Memory Usage: 6510kB
+                                                   Buffers: temp read=1038 written=2274
+                                                   ->  Nested Loop  (cost=2697.37..2729.82 rows=2400 width=8) (actual time=274.141..355.362 rows=456324.00 loops=1)
+                                                         Buffers: temp read=1038 written=1106
+                                                         ->  HashAggregate  (cost=2697.37..2699.37 rows=200 width=4) (actual time=274.119..282.226 rows=38027.00 loops=1)
+                                                               Group Key: per_month.customer_id
+                                                               Batches: 1  Memory Usage: 2089kB
+                                                               Buffers: temp read=1038 written=1106
+                                                               ->  CTE Scan on per_month  (cost=0.00..2397.66 rows=119883 width=4) (actual time=122.394..241.703 rows=101146.00 loops=1)
+                                                                     Storage: Disk  Maximum Storage: 4096kB
+                                                                     Buffers: temp read=1038 written=1106
+                                                         ->  Materialize  (cost=0.00..0.48 rows=12 width=4) (actual time=0.000..0.001 rows=12.00 loops=38027)
+                                                               Storage: Memory  Maximum Storage: 17kB
+                                                               ->  Result  (cost=0.00..0.42 rows=12 width=4) (actual time=0.014..0.043 rows=12.00 loops=1)
+                                                                     ->  ProjectSet  (cost=0.00..0.09 rows=12 width=8) (actual time=0.012..0.017 rows=12.00 loops=1)
+                                                                           ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.001..0.001 rows=1.00 loops=1)
+   SubPlan 3
+     ->  Aggregate  (cost=0.13..0.14 rows=1 width=32) (actual time=0.003..0.003 rows=1.00 loops=39885)
+           ->  Function Scan on unnest x  (cost=0.00..0.10 rows=10 width=32) (actual time=0.001..0.002 rows=11.44 loops=39885)
+ Planning:
+   Buffers: shared hit=334
+ Planning Time: 2.034 ms
+ Execution Time: 1525.400 ms
+(85 rows)
+
+### C. Top 100
+                                                                                                                                                                   QUERY PLAN                                                                                                                                                                    
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ WindowAgg  (cost=42605.21..48887.08 rows=39885 width=162) (actual time=1035.896..1036.417 rows=100.00 loops=1)
+   Window: w1 AS (ORDER BY (COALESCE(pc.total_spent, '0'::numeric)) ROWS UNBOUNDED PRECEDING)
+   Run Condition: (rank() OVER w1 <= 100)
+   Storage: Memory  Maximum Storage: 17kB
+   Buffers: shared hit=2135, temp read=4870 written=5955
+   CTE counted
+     ->  Seq Scan on orders o  (cost=0.00..4655.44 rows=122602 width=27) (actual time=0.009..33.016 rows=124024.00 loops=1)
+           Filter: ((status = ANY ('{completed,shipped}'::text[])) AND (order_date < '2026-09-01'::date) AND (order_date <= now()))
+           Rows Removed by Filter: 35148
+           Buffers: shared hit=1472
+   CTE per_month
+     ->  HashAggregate  (cost=13283.07..16799.08 rows=119883 width=40) (actual time=88.782..154.549 rows=101146.00 loops=1)
+           Group Key: counted_1.customer_id, (date_trunc('month'::text, counted_1.order_date))::date
+           Planned Partitions: 8  Batches: 9  Memory Usage: 8273kB  Disk Usage: 3544kB
+           Buffers: temp read=1038 written=796
+           ->  CTE Scan on counted counted_1  (cost=0.00..4283.10 rows=121008 width=24) (actual time=0.222..56.402 rows=122392.00 loops=1)
+                 Filter: (order_date >= (date_trunc('month'::text, ('2026-08-31'::date)::timestamp with time zone) - '11 mons'::interval))
+                 Rows Removed by Filter: 1632
+                 Storage: Disk  Maximum Storage: 4982kB
+                 Buffers: temp read=623 written=1
+   ->  Sort  (cost=21150.66..21250.38 rows=39885 width=122) (actual time=1035.860..1035.899 rows=101.00 loops=1)
+         Sort Key: (COALESCE(pc.total_spent, '0'::numeric)) DESC
+         Sort Method: external merge  Disk: 7992kB
+         Buffers: shared hit=2135, temp read=4870 written=5955
+         ->  Hash Left Join  (cost=14237.97..15509.24 rows=39885 width=122) (actual time=981.830..1010.783 rows=39885.00 loops=1)
+               Hash Cond: (c.customer_id = mo.customer_id)
+               Buffers: shared hit=2135, temp read=4409 written=4954
+               ->  Hash Left Join  (cost=4284.91..5451.47 rows=39885 width=90) (actual time=156.026..173.877 rows=39885.00 loops=1)
+                     Hash Cond: (c.customer_id = pc.customer_id)
+                     Buffers: shared hit=2135, temp read=181 written=963
+                     ->  Seq Scan on customers c  (cost=0.00..1061.85 rows=39885 width=50) (actual time=0.044..2.989 rows=39885.00 loops=1)
+                           Buffers: shared hit=663
+                     ->  Hash  (cost=3958.72..3958.72 rows=26096 width=44) (actual time=155.956..155.957 rows=38095.00 loops=1)
+                           Buckets: 65536 (originally 32768)  Batches: 1 (originally 1)  Memory Usage: 2534kB
+                           Buffers: shared hit=1472, temp read=181 written=963
+                           ->  Subquery Scan on pc  (cost=3371.56..3958.72 rows=26096 width=44) (actual time=119.580..149.096 rows=38095.00 loops=1)
+                                 Buffers: shared hit=1472, temp read=181 written=963
+                                 ->  HashAggregate  (cost=3371.56..3697.76 rows=26096 width=44) (actual time=119.579..145.827 rows=38095.00 loops=1)
+                                       Group Key: counted.customer_id
+                                       Batches: 5  Memory Usage: 8241kB  Disk Usage: 1704kB
+                                       Buffers: shared hit=1472, temp read=181 written=963
+                                       ->  CTE Scan on counted  (cost=0.00..2452.04 rows=122602 width=20) (actual time=0.010..70.009 rows=124024.00 loops=1)
+                                             Storage: Disk  Maximum Storage: 4982kB
+                                             Buffers: shared hit=1472, temp written=622
+               ->  Hash  (cost=9950.56..9950.56 rows=200 width=36) (actual time=825.791..825.796 rows=38027.00 loops=1)
+                     Buckets: 65536 (originally 1024)  Batches: 1 (originally 1)  Memory Usage: 6697kB
+                     Buffers: temp read=4228 written=3991
+                     ->  Subquery Scan on mo  (cost=9892.11..9950.56 rows=200 width=36) (actual time=659.936..817.009 rows=38027.00 loops=1)
+                           Buffers: temp read=4228 written=3991
+                           ->  GroupAggregate  (cost=9892.11..9948.56 rows=200 width=36) (actual time=659.934..814.329 rows=38027.00 loops=1)
+                                 Group Key: per_month.customer_id
+                                 Buffers: temp read=4228 written=3991
+                                 ->  Sort  (cost=9892.11..9910.09 rows=7193 width=40) (actual time=659.909..745.392 rows=456324.00 loops=1)
+                                       Sort Key: per_month.customer_id, (((generate_series((date_trunc('month'::text, ('2026-08-31'::date)::timestamp with time zone) - '11 mons'::interval), date_trunc('month'::text, ('2026-08-31'::date)::timestamp with time zone), '1 mon'::interval)))::date)
+                                       Sort Method: external merge  Disk: 8888kB
+                                       Buffers: temp read=4228 written=3991
+                                       ->  Hash Right Join  (cost=2765.82..9431.31 rows=7193 width=40) (actual time=360.668..499.226 rows=456324.00 loops=1)
+                                             Hash Cond: ((pm.customer_id = per_month.customer_id) AND (pm.month = (((generate_series((date_trunc('month'::text, ('2026-08-31'::date)::timestamp with time zone) - '11 mons'::interval), date_trunc('month'::text, ('2026-08-31'::date)::timestamp with time zone), '1 mon'::interval)))::date)))
+                                             Buffers: temp read=3117 written=2875
+                                             ->  CTE Scan on per_month pm  (cost=0.00..2397.66 rows=119883 width=40) (actual time=0.017..8.720 rows=101146.00 loops=1)
+                                                   Storage: Disk  Maximum Storage: 4096kB
+                                                   Buffers: temp read=311 written=1
+                                             ->  Hash  (cost=2729.82..2729.82 rows=2400 width=8) (actual time=360.590..360.593 rows=456324.00 loops=1)
+                                                   Buckets: 262144 (originally 4096)  Batches: 4 (originally 1)  Memory Usage: 6510kB
+                                                   Buffers: temp read=1038 written=2274
+                                                   ->  Nested Loop  (cost=2697.37..2729.82 rows=2400 width=8) (actual time=207.579..279.399 rows=456324.00 loops=1)
+                                                         Buffers: temp read=1038 written=1106
+                                                         ->  HashAggregate  (cost=2697.37..2699.37 rows=200 width=4) (actual time=207.558..214.470 rows=38027.00 loops=1)
+                                                               Group Key: per_month.customer_id
+                                                               Batches: 1  Memory Usage: 2089kB
+                                                               Buffers: temp read=1038 written=1106
+                                                               ->  CTE Scan on per_month  (cost=0.00..2397.66 rows=119883 width=4) (actual time=88.785..182.751 rows=101146.00 loops=1)
+                                                                     Storage: Disk  Maximum Storage: 4096kB
+                                                                     Buffers: temp read=1038 written=1106
+                                                         ->  Materialize  (cost=0.00..0.48 rows=12 width=4) (actual time=0.000..0.001 rows=12.00 loops=38027)
+                                                               Storage: Memory  Maximum Storage: 17kB
+                                                               ->  Result  (cost=0.00..0.42 rows=12 width=4) (actual time=0.012..0.018 rows=12.00 loops=1)
+                                                                     ->  ProjectSet  (cost=0.00..0.09 rows=12 width=8) (actual time=0.011..0.015 rows=12.00 loops=1)
+                                                                           ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.001..0.001 rows=1.00 loops=1)
+   SubPlan 3
+     ->  Aggregate  (cost=0.13..0.14 rows=1 width=32) (actual time=0.004..0.004 rows=1.00 loops=101)
+           ->  Function Scan on unnest x  (cost=0.00..0.10 rows=10 width=32) (actual time=0.001..0.002 rows=12.00 loops=101)
+ Planning:
+   Buffers: shared hit=4
+ Planning Time: 0.777 ms
+ Execution Time: 1040.645 ms
+(86 rows)
+
+### D. Running total, every counted order
+                                                                          QUERY PLAN                                                                           
+---------------------------------------------------------------------------------------------------------------------------------------------------------------
+ WindowAgg  (cost=0.51..10819.30 rows=122913 width=59) (actual time=0.106..130.024 rows=124029.00 loops=1)
+   Window: w1 AS (PARTITION BY o.customer_id ORDER BY o.order_date, o.order_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+   Storage: Memory  Maximum Storage: 17kB
+   Buffers: shared hit=12 read=1266
+   ->  Index Only Scan using ix_orders_customer_date on orders o  (cost=0.42..8361.04 rows=122913 width=27) (actual time=0.097..46.628 rows=124029.00 loops=1)
+         Index Cond: (order_date <= now())
+         Filter: (status = ANY ('{completed,shipped}'::text[]))
+         Rows Removed by Filter: 35128
+         Heap Fetches: 0
+         Index Searches: 1
+         Buffers: shared hit=12 read=1266
+ Planning:
+   Buffers: shared hit=19
+ Planning Time: 0.179 ms
+ Execution Time: 134.751 ms
+(15 rows)
+
+### E. Running total, one customer
+                                                                   QUERY PLAN                                                                    
+-------------------------------------------------------------------------------------------------------------------------------------------------
+ WindowAgg  (cost=2.47..8.60 rows=4 width=59) (actual time=0.189..0.194 rows=4.00 loops=1)
+   Window: w1 AS (ORDER BY o.order_date, o.order_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+   Storage: Memory  Maximum Storage: 17kB
+   Buffers: shared hit=4
+   ->  Index Only Scan using ix_orders_customer_date on orders o  (cost=0.42..8.54 rows=4 width=27) (actual time=0.179..0.182 rows=4.00 loops=1)
+         Index Cond: ((customer_id = 100001) AND (order_date <= now()))
+         Filter: (status = ANY ('{completed,shipped}'::text[]))
+         Rows Removed by Filter: 2
+         Heap Fetches: 0
+         Index Searches: 1
+         Buffers: shared hit=4
+ Planning Time: 0.130 ms
+ Execution Time: 0.229 ms
+(13 rows)
+
+### F. Low-stock rollup, whole tree
+                                                                 QUERY PLAN                                                                  
+---------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=3795.17..3795.56 rows=158 width=96) (actual time=7.076..7.086 rows=95.00 loops=1)
+   Sort Key: t.category_path
+   Sort Method: quicksort  Memory: 33kB
+   Buffers: shared hit=48
+   CTE tree
+     ->  Recursive Union  (cost=0.00..63.11 rows=447 width=105) (actual time=0.020..0.201 rows=95.00 loops=1)
+           Storage: Memory  Maximum Storage: 48kB
+           Buffers: shared hit=5
+           ->  Seq Scan on categories c  (cost=0.00..1.94 rows=7 width=83) (actual time=0.019..0.026 rows=10.00 loops=1)
+                 Filter: (parent_id IS NULL)
+                 Rows Removed by Filter: 85
+                 Buffers: shared hit=1
+           ->  Hash Join  (cost=1.84..5.67 rows=44 width=105) (actual time=0.014..0.037 rows=21.25 loops=4)
+                 Hash Cond: (c_1.parent_id = t_2.category_id)
+                 Buffers: shared hit=4
+                 ->  Seq Scan on categories c_1  (cost=0.00..1.94 rows=94 width=18) (actual time=0.001..0.005 rows=95.00 loops=4)
+                       Buffers: shared hit=4
+                 ->  Hash  (cost=1.40..1.40 rows=35 width=104) (actual time=0.007..0.007 rows=23.75 loops=4)
+                       Buckets: 1024  Batches: 1  Memory Usage: 20kB
+                       ->  WorkTable Scan on tree t_2  (cost=0.00..1.40 rows=35 width=104) (actual time=0.000..0.003 rows=23.75 loops=4)
+                             Filter: (NOT is_cycle)
+   ->  HashAggregate  (cost=3722.34..3726.29 rows=158 width=96) (actual time=6.854..6.896 rows=95.00 loops=1)
+         Group Key: t.category_path, t.category_id, t.depth
+         Batches: 1  Memory Usage: 48kB
+         Buffers: shared hit=45
+         ->  Hash Right Join  (cost=142.26..2722.40 rows=49997 width=48) (actual time=1.131..4.198 rows=12898.00 loops=1)
+               Hash Cond: (a.ancestor_id = t.category_id)
+               Buffers: shared hit=45
+               ->  Hash Join  (cost=130.52..871.49 rows=44640 width=12) (actual time=0.876..2.142 rows=12895.00 loops=1)
+                     Hash Cond: (t_1.category_id = p.category_id)
+                     Buffers: shared hit=40
+                     ->  Nested Loop  (cost=0.00..53.74 rows=2240 width=8) (actual time=0.004..0.178 rows=260.00 loops=1)
+                           ->  CTE Scan on tree t_1  (cost=0.00..8.94 rows=224 width=36) (actual time=0.001..0.023 rows=95.00 loops=1)
+                                 Filter: (NOT is_cycle)
+                                 Storage: Memory  Maximum Storage: 36kB
+                           ->  Function Scan on unnest a  (cost=0.00..0.10 rows=10 width=4) (actual time=0.001..0.001 rows=2.74 loops=95)
+                     ->  Hash  (cost=80.23..80.23 rows=4023 width=12) (actual time=0.855..0.855 rows=4023.00 loops=1)
+                           Buckets: 4096  Batches: 1  Memory Usage: 205kB
+                           Buffers: shared hit=40
+                           ->  Seq Scan on products p  (cost=0.00..80.23 rows=4023 width=12) (actual time=0.011..0.396 rows=4023.00 loops=1)
+                                 Buffers: shared hit=40
+               ->  Hash  (cost=8.94..8.94 rows=224 width=40) (actual time=0.252..0.252 rows=95.00 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 15kB
+                     Buffers: shared hit=5
+                     ->  CTE Scan on tree t  (cost=0.00..8.94 rows=224 width=40) (actual time=0.022..0.238 rows=95.00 loops=1)
+                           Filter: (NOT is_cycle)
+                           Storage: Memory  Maximum Storage: 36kB
+                           Buffers: shared hit=5
+ Planning:
+   Buffers: shared hit=494
+ Planning Time: 1.480 ms
+ Execution Time: 7.155 ms
+(52 rows)
+
+### G. Stock trail, one product
+                                                                            QUERY PLAN                                                                             
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ WindowAgg  (cost=823.78..825.16 rows=70 width=96) (actual time=0.465..0.493 rows=79.00 loops=1)
+   Window: w1 AS (ORDER BY l.created_at, l.log_id ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+   Storage: Memory  Maximum Storage: 17kB
+   Buffers: shared hit=83 read=3
+   ->  Sort  (cost=823.76..823.93 rows=70 width=88) (actual time=0.460..0.464 rows=79.00 loops=1)
+         Sort Key: l.created_at, l.log_id
+         Sort Method: quicksort  Memory: 31kB
+         Buffers: shared hit=83 read=3
+         ->  Nested Loop Left Join  (cost=5.68..821.61 rows=70 width=88) (actual time=0.062..0.411 rows=79.00 loops=1)
+               Buffers: shared hit=80 read=3
+               ->  Nested Loop  (cost=5.25..253.24 rows=70 width=84) (actual time=0.056..0.378 rows=79.00 loops=1)
+                     Buffers: shared hit=80 read=3
+                     ->  Index Scan using products_pkey on products p  (cost=0.28..8.30 rows=1 width=23) (actual time=0.010..0.011 rows=1.00 loops=1)
+                           Index Cond: (product_id = 5005)
+                           Index Searches: 1
+                           Buffers: shared hit=3
+                     ->  Bitmap Heap Scan on inventory_log l  (cost=4.97..244.25 rows=70 width=65) (actual time=0.045..0.358 rows=79.00 loops=1)
+                           Recheck Cond: (product_id = 5005)
+                           Heap Blocks: exact=77
+                           Buffers: shared hit=77 read=3
+                           ->  Bitmap Index Scan on ix_inventory_log_product_time  (cost=0.00..4.95 rows=70 width=0) (actual time=0.026..0.026 rows=79.00 loops=1)
+                                 Index Cond: (product_id = 5005)
+                                 Index Searches: 1
+                                 Buffers: shared read=3
+               ->  Memoize  (cost=0.43..8.10 rows=1 width=12) (actual time=0.000..0.000 rows=0.00 loops=79)
+                     Cache Key: l.order_id
+                     Cache Mode: logical
+                     Hits: 78  Misses: 1  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                     ->  Index Scan using orders_pkey on orders o  (cost=0.42..8.09 rows=1 width=12) (actual time=0.001..0.001 rows=0.00 loops=1)
+                           Index Cond: (order_id = l.order_id)
+                           Index Searches: 0
+ Planning:
+   Buffers: shared hit=172 read=1
+ Planning Time: 0.552 ms
+ Execution Time: 0.544 ms
+(35 rows)
+

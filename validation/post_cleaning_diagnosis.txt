@@ -1,0 +1,142 @@
+Null display is "(null)".
+SET
+=== OVERVIEW: every column of every table
+  table_name   |  column_name   |          data_type          | total  | nulls  | distinct_values | untrimmed 
+---------------+----------------+-----------------------------+--------+--------+-----------------+-----------
+ categories    | category_id    | integer                     |     95 |      0 |              95 |         0
+ categories    | category_name  | text                        |     95 |      0 |              95 |         0
+ categories    | parent_id      | integer                     |     95 |     10 |              30 |         0
+ customers     | customer_id    | integer                     |  39885 |      0 |           39885 |         0
+ customers     | full_name      | text                        |  39885 |      0 |            1931 |         0
+ customers     | email          | text                        |  39885 |      0 |           39885 |         0
+ customers     | phone          | text                        |  39885 |      0 |           39883 |         0
+ customers     | city           | text                        |  39885 |      0 |              12 |         0
+ customers     | registered_at  | timestamp without time zone |  39885 |      0 |           39157 |         0
+ inventory_log | log_id         | integer                     | 282246 |      0 |          282246 |         0
+ inventory_log | product_id     | integer                     | 282246 |      0 |            4023 |         0
+ inventory_log | change_qty     | integer                     | 282246 |      0 |              80 |         0
+ inventory_log | reason         | text                        | 282246 |      0 |               6 |         0
+ inventory_log | created_at     | timestamp without time zone | 282246 |      0 |          143628 |         0
+ inventory_log | note           | text                        | 282246 | 281807 |               7 |         0
+ order_items   | order_item_id  | integer                     | 334864 |      0 |          334864 |         0
+ order_items   | order_id       | integer                     | 334864 |      0 |          159172 |         0
+ order_items   | product_id     | integer                     | 334864 |      0 |            4023 |         0
+ order_items   | quantity       | integer                     | 334864 |      0 |               5 |         0
+ order_items   | unit_price     | numeric                     | 334864 |    148 |            7157 |         0
+ orders        | order_id       | integer                     | 159172 |      0 |          159172 |         0
+ orders        | customer_id    | integer                     | 159172 |      0 |           39137 |         0
+ orders        | order_date     | timestamp without time zone | 159172 |      0 |          158091 |         0
+ orders        | status         | text                        | 159172 |      0 |               5 |         0
+ orders        | total_amount   | numeric                     | 159172 |      0 |           88179 |         0
+ products      | product_id     | integer                     |   4023 |      0 |            4023 |         0
+ products      | product_name   | text                        |   4023 |      0 |            3588 |         0
+ products      | category_id    | integer                     |   4023 |      0 |              63 |         0
+ products      | price          | numeric                     |   4023 |      0 |            3804 |         0
+ products      | stock_quantity | integer                     |   4023 |      0 |              14 |         0
+ products      | created_at     | timestamp without time zone |   4023 |      0 |            3986 |         0
+(31 rows)
+
+=== OVERVIEW: constraints in place (raw load: primary keys only; foreign keys come from relationDATA)
+  table_name   |                                                                                                           constraints                                                                                                            
+---------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ customers     | PRIMARY KEY (customer_id)
+ products      | PRIMARY KEY (product_id); FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE RESTRICT; CHECK ((stock_quantity >= 0))
+ inventory_log | PRIMARY KEY (log_id); FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE RESTRICT
+ orders        | PRIMARY KEY (order_id); FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT; CHECK ((status = ANY (ARRAY['pending'::text, 'shipped'::text, 'completed'::text, 'cancelled'::text, 'refunded'::text])))
+ order_items   | PRIMARY KEY (order_item_id); FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE RESTRICT; FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE RESTRICT; CHECK ((quantity > 0))
+ categories    | PRIMARY KEY (category_id); FOREIGN KEY (parent_id) REFERENCES categories(category_id) ON DELETE RESTRICT
+(6 rows)
+
+=== PRODUCTS AND CATEGORIES
+ tree_status | categories | products | category_ids 
+-------------+------------+----------+--------------
+ ok, depth 1 |         10 |       37 | (null)
+ ok, depth 2 |         19 |        6 | (null)
+ ok, depth 3 |         52 |     3074 | (null)
+ ok, depth 4 |         14 |      906 | (null)
+(4 rows)
+
+ negative_stock | zero_stock | no_category | on_non_leaf_category | distinct_stock_values | repeated_names 
+----------------+------------+-------------+----------------------+-----------------------+----------------
+              0 |        591 |           0 |                    0 |                    14 |            435
+(1 row)
+
+ product_id | product_name | stock_quantity | units_sold | sales_rank 
+------------+--------------+----------------+------------+------------
+(0 rows)
+
+=== CUSTOMERS
+ surplus_duplicate_accounts | untrimmed_emails | invalid_after_trim | phone_formats | city_spellings | names_not_title_case 
+----------------------------+------------------+--------------------+---------------+----------------+----------------------
+                          0 |                0 |                  0 |             5 | 12 -> 12       |                 3923
+(1 row)
+
+ people_with_split_spend | split_spend | top100_changes_when_merged 
+-------------------------+-------------+----------------------------
+                       0 |      (null) |                          0
+(1 row)
+
+=== ORDERS
+  status   | orders | clean_rows | raw_spellings 
+-----------+--------+------------+---------------
+ completed | 111206 |     111206 | "completed"
+ pending   |  15985 |      15985 | "pending"
+ shipped   |  12837 |      12837 | "shipped"
+ cancelled |  12675 |      12675 | "cancelled"
+ refunded  |   6469 |       6469 | "refunded"
+(5 rows)
+
+ unknown_customer | unknown_id_range | extract_end | after_extract_end | in_future | before_registration 
+------------------+------------------+-------------+-------------------+-----------+---------------------
+                0 | (null)           | 2026-08-31  |                24 |        15 |                   0
+(1 row)
+
+  likely_cause   | orders | total_exactly_half | total_minus_items 
+-----------------+--------+--------------------+-------------------
+ unexplained     |   1591 |                  0 |          37831.62
+ unpriced line   |    294 |                  0 |         533338.30
+ duplicated line |     10 |                  0 |         -17936.93
+(3 rows)
+
+=== ORDER ITEMS
+ unknown_order | exact_duplicate_lines | extreme_quantity | null_price | zero_price | below_current_price | above_current_price 
+---------------+-----------------------+------------------+------------+------------+---------------------+---------------------
+             0 |                    49 |                0 |        148 |        151 |                3954 |                   0
+(1 row)
+
+ order_id | product_id | quantity | unit_price | status | total_amount 
+----------+------------+----------+------------+--------+--------------
+(0 rows)
+
+=== INVENTORY LOG
+   reason   | entries | stock_in | stock_out | no_change 
+------------+---------+----------+-----------+-----------
+ sale       |  261968 |        0 |    261968 |         0
+ restock    |   18857 |    18857 |         0 |         0
+ return     |     564 |      564 |         0 |         0
+ correction |     499 |      209 |       290 |         0
+ damage     |     268 |        0 |       268 |         0
+ stock_take |      90 |        0 |         0 |        90
+(6 rows)
+
+ unknown_product | in_future | before_product_created | with_note |                                                                  distinct_notes                                                                   
+-----------------+-----------+------------------------+-----------+---------------------------------------------------------------------------------------------------------------------------------------------------
+               0 |        33 |                      0 |       439 | ?? | adjusted after complaint | cleaning 03: negative stock reset to 0 | counted by hand | POS mismatch | recount, not applied | see WhatsApp msg
+(1 row)
+
+ comparison  | products | worst_gap 
+-------------+----------+-----------
+ stock = log |     3879 |         0
+ stock < log |      122 |        56
+ stock > log |       22 |         6
+(3 rows)
+
+         source         | entries | units  
+------------------------+---------+--------
+ log: sale entries      |  261968 | 412525
+ order lines: fulfilled |  261330 | 411531
+ order lines: pending   |   33570 |  53228
+ order lines: cancelled |   26436 |  41679
+ order lines: refunded  |   13528 |  21474
+(5 rows)
+
