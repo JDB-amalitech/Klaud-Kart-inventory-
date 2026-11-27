@@ -1,0 +1,45 @@
+services:
+  db:
+    # PostgreSQL 18: the version the lab is graded on.
+    image: postgres:18
+    container_name: kloudkart-db
+    restart: unless-stopped
+    # 400 concurrent buyers in race_test.py need 400 connections; the default of 100 refuses most of them.
+    command: ["postgres", "-c", "max_connections=500"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kloudkart}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kloudkart}
+      POSTGRES_DB: ${POSTGRES_DB:-kloudkart}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    # load.sql uses relative \copy paths (data/*.csv), so psql must run from here.
+    working_dir: /kloudkart
+    volumes:
+      # PostgreSQL 18 images keep data under /var/lib/postgresql/<version>/, so mount the parent.
+      - pgdata:/var/lib/postgresql
+      - ./M03_Resources:/kloudkart:ro
+      # Diagnosis scripts: psql -f /profiling/diagnosis.sql
+      - ./profiling:/profiling:ro
+      # Relationships and reconciliation: psql -f /relationDATA/<file>.sql
+      - ./relationDATA:/relationDATA:ro
+      # Cleaning steps: psql -f /cleaning/clean_all.sql (or one step file)
+      - ./cleaning:/cleaning:ro
+      # Schema upgrade after cleaning: psql -f /schema/upgrade.sql
+      - ./schema:/schema:ro
+      # Nana's four goals: psql -f /solution/solution_all.sql
+      - ./solution:/solution:ro
+      # Before/after performance measurements: psql -f /performance/<file>.sql
+      - ./performance:/performance:ro
+      # Run once, in name order, on first start with an empty volume.
+      - ./M03_Resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./M03_Resources/load.sql:/docker-entrypoint-initdb.d/02-load.sql:ro
+    healthcheck:
+      # TCP check: the temporary server used while the CSVs load listens on the socket only,
+      # so this passes only once the real server is up and the data is fully loaded.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  pgdata:

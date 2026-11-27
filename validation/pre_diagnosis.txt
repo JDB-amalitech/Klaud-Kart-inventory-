@@ -1,0 +1,168 @@
+Null display is "(null)".
+SET
+=== OVERVIEW: every column of every table
+  table_name   |  column_name   |          data_type          | total  | nulls  | distinct_values | untrimmed 
+---------------+----------------+-----------------------------+--------+--------+-----------------+-----------
+ categories    | category_id    | integer                     |     94 |      0 |              94 |         0
+ categories    | category_name  | text                        |     94 |      0 |              94 |         0
+ categories    | parent_id      | integer                     |     94 |      7 |              32 |         0
+ customers     | customer_id    | integer                     |  40420 |      0 |           40420 |         0
+ customers     | full_name      | text                        |  40420 |      0 |            2552 |      1153
+ customers     | email          | text                        |  40420 |      0 |           40121 |      1314
+ customers     | phone          | text                        |  40420 |      0 |           40418 |         0
+ customers     | city           | text                        |  40420 |      0 |              15 |      2613
+ customers     | registered_at  | timestamp without time zone |  40420 |      0 |           39376 |         0
+ inventory_log | log_id         | integer                     | 282352 |      0 |          282352 |         0
+ inventory_log | product_id     | integer                     | 282352 |      0 |            4134 |         0
+ inventory_log | change_qty     | integer                     | 282352 |      0 |              80 |         0
+ inventory_log | reason         | text                        | 282352 |      0 |               6 |         0
+ inventory_log | created_at     | timestamp without time zone | 282352 |      0 |          143747 |         0
+ inventory_log | note           | text                        | 282352 | 281927 |               6 |         0
+ order_items   | order_item_id  | integer                     | 336559 |      0 |          336559 |         0
+ order_items   | order_id       | integer                     | 336559 |      0 |          160073 |         0
+ order_items   | product_id     | integer                     | 336559 |      0 |            4023 |         0
+ order_items   | quantity       | integer                     | 336559 |      0 |               7 |         0
+ order_items   | unit_price     | numeric                     | 336559 |    148 |            7160 |         0
+ orders        | order_id       | integer                     | 159384 |      0 |          159384 |         0
+ orders        | customer_id    | integer                     | 159384 |      0 |           39842 |         0
+ orders        | order_date     | timestamp without time zone | 159384 |      0 |          158301 |         0
+ orders        | status         | text                        | 159384 |      0 |              15 |     22395
+ orders        | total_amount   | numeric                     | 159384 |      0 |           88280 |         0
+ products      | product_id     | integer                     |   4023 |      0 |            4023 |         0
+ products      | product_name   | text                        |   4023 |      0 |            3588 |         0
+ products      | category_id    | integer                     |   4023 |     37 |              62 |         0
+ products      | price          | numeric                     |   4023 |      0 |            3804 |         0
+ products      | stock_quantity | integer                     |   4023 |      0 |              18 |         0
+ products      | created_at     | timestamp without time zone |   4023 |      0 |            3986 |         0
+(31 rows)
+
+=== OVERVIEW: constraints in place (raw load: primary keys only; foreign keys come from relationDATA)
+  table_name   |                                                                                             constraints                                                                                             
+---------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ customers     | PRIMARY KEY (customer_id)
+ products      | PRIMARY KEY (product_id); FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE RESTRICT NOT VALID
+ inventory_log | PRIMARY KEY (log_id); FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE RESTRICT NOT VALID
+ orders        | PRIMARY KEY (order_id); FOREIGN KEY (customer_id) REFERENCES customers(customer_id) ON DELETE RESTRICT NOT VALID
+ order_items   | PRIMARY KEY (order_item_id); FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE RESTRICT NOT VALID; FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE RESTRICT NOT VALID
+ categories    | PRIMARY KEY (category_id); FOREIGN KEY (parent_id) REFERENCES categories(category_id) ON DELETE RESTRICT NOT VALID
+(6 rows)
+
+=== PRODUCTS AND CATEGORIES
+  tree_status   | categories | products | category_ids 
+----------------+------------+----------+--------------
+ in a cycle     |          2 |        6 | {9001,9002}
+ ok, depth 1    |          7 |        0 | (null)
+ ok, depth 2    |         18 |        0 | (null)
+ ok, depth 3    |         52 |     3074 | (null)
+ ok, depth 4    |         14 |      906 | (null)
+ parent missing |          1 |        0 | {9003}
+(6 rows)
+
+ negative_stock | zero_stock | no_category | on_non_leaf_category | distinct_stock_values | repeated_names 
+----------------+------------+-------------+----------------------+-----------------------+----------------
+             14 |        577 |          37 |                    6 |                    18 |            435
+(1 row)
+
+ product_id |        product_name         | stock_quantity | units_sold | sales_rank 
+------------+-----------------------------+----------------+------------+------------
+       6392 | Tecno Blender 2             |             -1 |        153 |        523
+       6399 | Anker Sunscreen Max         |             -1 |        151 |        604
+       5005 | LG Mice XL                  |             -4 |        146 |        836
+       8353 | Infinix TV Accessorie       |             -1 |        136 |       1506
+       5391 | Unilever Keyboard Lite      |             -4 |        132 |       1831
+       5322 | Midea Rice 3                |             -2 |        128 |       2161
+       6148 | Kasapreko Mice              |             -1 |        127 |       2253
+       8107 | JBL Speaker Mini            |             -2 |        126 |       2356
+       5057 | Asus Fan                    |             -4 |        122 |       2714
+       7390 | Ideal Kettle Mini           |             -3 |        121 |       2790
+       6295 | JBL Kettle Mini             |             -1 |        115 |       3251
+       8659 | Zeepay Soft Drink 3         |             -1 |        114 |       3328
+       8862 | Sunlight Women Accessorie 2 |             -1 |        113 |       3387
+       7049 | Tecno Feature Phone 3       |             -1 |        103 |       3824
+(14 rows)
+
+=== CUSTOMERS
+ surplus_duplicate_accounts | untrimmed_emails | invalid_after_trim | phone_formats | city_spellings | names_not_title_case 
+----------------------------+------------------+--------------------+---------------+----------------+----------------------
+                        535 |             1314 |                  0 |             5 | 15 -> 12       |                 4994
+(1 row)
+
+ people_with_split_spend | split_spend | top100_changes_when_merged 
+-------------------------+-------------+----------------------------
+                     513 | 12603513.59 |                          3
+(1 row)
+
+=== ORDERS
+  status   | orders | clean_rows |                  raw_spellings                   
+-----------+--------+------------+--------------------------------------------------
+ completed |  89066 |      22091 | " completed" "completed" "Completed" "COMPLETED"
+ complete  |  22285 |      22285 | "complete"
+ pending   |  16009 |       7928 | "pending" "Pending"
+ shipped   |  12848 |       6516 | "shipped" "Shipped"
+ cancelled |   9488 |       3238 | "cancelled" "Cancelled" "CANCELLED"
+ refunded  |   6479 |       3217 | "refunded" "Refunded"
+ canceled  |   3209 |       3209 | "canceled"
+(7 rows)
+
+ unknown_customer | unknown_id_range | extract_end | after_extract_end | in_future | before_registration 
+------------------+------------------+-------------+-------------------+-----------+---------------------
+              210 | 999007-999997    | 2026-08-31  |                24 |        15 |                   0
+(1 row)
+
+     likely_cause      | orders | total_exactly_half | total_minus_items 
+-----------------------+--------+--------------------+-------------------
+ unexplained           |   1590 |                  0 |          36675.16
+ duplicated line       |    536 |                104 |        -900081.59
+ unpriced line         |    294 |                  0 |         522695.51
+ extreme quantity line |      6 |                  0 |       -3059982.98
+(4 rows)
+
+=== ORDER ITEMS
+ unknown_order | exact_duplicate_lines | extreme_quantity | null_price | zero_price | below_current_price | above_current_price 
+---------------+-----------------------+------------------+------------+------------+---------------------+---------------------
+           692 |                   578 |                6 |        148 |        152 |                3964 |                   0
+(1 row)
+
+ order_id | product_id | quantity | unit_price |  status   | total_amount 
+----------+------------+----------+------------+-----------+--------------
+   583621 |       8308 |     9999 |      87.35 | canceled  |        87.35
+   637704 |       6714 |     9999 |      11.23 | pending   |      1794.61
+   600888 |       7260 |      999 |      99.05 | shipped   |      4017.21
+   551664 |       7471 |      999 |     827.35 | completed |      1879.21
+   620022 |       7504 |      999 |      20.13 | Completed |        20.13
+   569332 |       7653 |      999 |    1143.30 | Cancelled |     14794.09
+(6 rows)
+
+=== INVENTORY LOG
+   reason   | entries | stock_in | stock_out | no_change 
+------------+---------+----------+-----------+-----------
+ sale       |  262088 |        0 |    262088 |         0
+ restock    |   18857 |    18857 |         0 |         0
+ return     |     564 |      564 |         0 |         0
+ correction |     485 |      195 |       290 |         0
+ damage     |     268 |        0 |       268 |         0
+ stock_take |      90 |        0 |         0 |        90
+(6 rows)
+
+ unknown_product | in_future | before_product_created | with_note |                                              distinct_notes                                              
+-----------------+-----------+------------------------+-----------+----------------------------------------------------------------------------------------------------------
+             120 |        33 |                      0 |       425 | ?? | adjusted after complaint | counted by hand | POS mismatch | recount, not applied | see WhatsApp msg
+(1 row)
+
+ comparison  | products | worst_gap 
+-------------+----------+-----------
+ stock = log |     3879 |         0
+ stock < log |      122 |        56
+ stock > log |       22 |         6
+(3 rows)
+
+         source         | entries | units  
+------------------------+---------+--------
+ order lines: fulfilled |  262106 | 415712
+ log: sale entries      |  262088 | 412645
+ order lines: pending   |   33671 |  63413
+ order lines: cancelled |   19903 |  32507
+ order lines: refunded  |   13564 |  21531
+ order lines: canceled  |    6623 |  20320
+(6 rows)
+

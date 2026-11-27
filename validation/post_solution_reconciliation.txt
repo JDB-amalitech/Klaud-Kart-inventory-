@@ -1,0 +1,45 @@
+SET
+       relationship        |  refs  | orphans | null_refs | match_rate_pct | value_at_risk 
+---------------------------+--------+---------+-----------+----------------+---------------
+ categories -> parent      |     85 |       0 |        10 |         100.00 |              
+ products -> categories    |   4023 |       0 |         0 |         100.00 |              
+ orders -> customers       | 159172 |       0 |         0 |         100.00 |              
+ inventory_log -> products | 282246 |       0 |         0 |         100.00 |              
+ order_items -> products   | 334864 |       0 |         0 |         100.00 |              
+ order_items -> orders     | 334864 |       0 |         0 |         100.00 |              
+(6 rows)
+
+     reconciliation      |           kpi           |   actual   | target 
+-------------------------+-------------------------+------------+--------
+ R2 order total vs lines | orders reconciled %     |      98.81 |    100
+ R2 order total vs lines | absolute variance (GHS) | 1361086.27 |      0
+ R2 order total vs lines | net variance (GHS)      |  553232.99 |      0
+(3 rows)
+
+ reconciliation  |                  kpi                  | actual | target 
+-----------------+---------------------------------------+--------+--------
+ R3 stock vs log | stock accuracy %                      |  96.42 |    100
+ R3 stock vs log | absolute unit variance                |   2553 |      0
+ R3 stock vs log | products already oversold (<0)        |      0 |      0
+ R3 stock vs log | units on pending orders, not deducted |  53228 |      0
+(4 rows)
+
+    reconciliation     |               kpi                | actual  | target 
+-----------------------+----------------------------------+---------+--------
+ R4 sales vs movements | movement coverage %              | 100.244 |    100
+ R4 sales vs movements | fulfilled lines with no movement |    -638 |      0
+ R4 sales vs movements | unit variance (sold - logged)    |    -994 |      0
+(3 rows)
+
+    reconciliation     |           kpi            | actual | target 
+-----------------------+--------------------------+--------+--------
+ R5 accounts vs people | duplicate account rate % |   0.00 |      0
+ R5 accounts vs people | surplus accounts         |      0 |      0
+(2 rows)
+
+    reconciliation     |             kpi              | actual | target 
+-----------------------+------------------------------+--------+--------
+ R6 products vs rollup | products covered by rollup % | 100.00 |    100
+ R6 products vs rollup | products invisible to rollup |      0 |      0
+(2 rows)
+

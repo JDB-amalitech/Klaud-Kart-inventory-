@@ -1,0 +1,15 @@
+race_test.py — Kloud Kart order placement under contention
+==================================================================
+  FAIL  No function named place_order exists in this database.
+        The contract is documented at the top of this file.
+Traceback (most recent call last):
+  File "c:\Users\JosephBotchway\Desktop\klaud-inventory\M03_Resources\race_test.py", line 443, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "c:\Users\JosephBotchway\Desktop\klaud-inventory\M03_Resources\race_test.py", line 409, in main
+    customer_id, base_pid = preflight()
+                            ~~~~~~~~~^^
+  File "c:\Users\JosephBotchway\Desktop\klaud-inventory\M03_Resources\race_test.py", line 187, in preflight
+    print(f"  place_order found: {found[0][0]}({found[0][1]})")
+                                  ~~~~~^^^
+IndexError: list index out of range
